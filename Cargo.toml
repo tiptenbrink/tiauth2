@@ -11,3 +11,5 @@ sqlx = { version = "0.5", features = [ "runtime-tokio-native-tls" , "postgres" ]
 axum = "0.4.3"
 async-trait = "0.1.52"
 thiserror = "1.0.30"
+sea-query = { version = "0.20.0", features = [
+    "sqlx-postgres"] }
