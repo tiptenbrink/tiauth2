@@ -25,6 +25,7 @@ impl KeyValue for Redis {
 
     async fn store_json<T: Serialize + Sync>(&self, key: &str, json: &T, expire: usize) -> Result<(), Error> {
         let json_str = serde_json_to_str(json)?;
+
         let _: () = redis::pipe()
             .expire(key, expire).ignore()
             .cmd("JSON.SET").arg(key).arg(".").arg(&json_str)
