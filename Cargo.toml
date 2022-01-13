@@ -13,3 +13,8 @@ async-trait = "0.1.52"
 thiserror = "1.0.30"
 sea-query = { version = "0.20.0", features = [
     "sqlx-postgres"] }
+redis = { version = "0.21.5", features = ["tokio-comp", "connection-manager"] }
+serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+tower = "0.4.11"
+tower-http = { version = "0.2.0", features = ["fs"] }

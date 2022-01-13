@@ -1,10 +1,8 @@
-use std::iter::Map;
-use std::ops::Deref;
-use sqlx::{Encode, FromRow, Pool, Postgres, Type};
+use sqlx::{FromRow, Pool, Postgres};
 use async_trait::async_trait;
-use sqlx::postgres::{PgPoolOptions, PgRow};
+use sqlx::postgres::{PgRow};
 use crate::error::Error;
-use sea_query::{Query, Value, Values};
+use sea_query::{Values};
 sea_query::sea_query_driver_postgres!();
 use sea_query_driver_postgres::{bind_query, bind_query_as};
 
