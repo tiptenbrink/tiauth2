@@ -56,3 +56,13 @@ pub struct OAuthFinish {
     pub flow_id: String,
     pub code: String
 }
+
+#[derive(Deserialize)]
+pub struct TokenRequest {
+    pub client_id: String,
+    pub grant_type: String,
+    pub code: Option<String>,
+    pub redirect_uri: Option<String>,
+    pub code_verifier: Option<String>,
+    pub refresh_token: Option<String>
+}

@@ -1,8 +1,9 @@
 use std::sync::Arc;
 use axum::extract::{Extension, Query};
+use axum::Json;
 use axum::response::{Redirect};
 use crate::data::kv::KeyValue;
-use crate::server::models::{AuthRequest, OAuthFinish};
+use crate::server::models::{AuthRequest, FlowUser, OAuthFinish, TokenRequest};
 use crate::data::source::Source;
 use crate::error::Error;
 use crate::utility::random_time_hash_hex;
@@ -28,3 +29,19 @@ pub async fn oauth_finish(Query(oauth_finish): Query<OAuthFinish>, Extension(dsr
     };
     Ok(Redirect::to(format!("{}{}", redirect, query).parse().unwrap()))
 }
+
+// pub async fn token(Json(token_request): Json<TokenRequest>, Extension(dsrc): Extension<Arc<Source>>) -> Result<Json<TokenResponse>, Error> {
+//     // TODO clientID check
+//
+//     if token_request.grant_type == "authorization_code" {
+//         let redirect_uri = token_request.redirect_uri.ok_or(Error::MissingFieldTokenRequest)?;
+//         let code_verifier = token_request.code_verifier.ok_or(Error::MissingFieldTokenRequest)?;
+//         let code = token_request.code.ok_or(Error::MissingFieldTokenRequest)?;
+//
+//         let flow_user: FlowUser = dsrc.kv.get_json(&code).await?
+//             .ok_or(Error::FlowExpired)?;
+//         let auth_request: AuthRequest = dsrc.kv.get_json(&flow_user.flow_id).await?
+//             .ok_or(Error::FlowExpired)?;
+//     }
+//     Ok()
+// }

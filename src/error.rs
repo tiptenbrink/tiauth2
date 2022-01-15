@@ -6,6 +6,9 @@ pub enum Error {
     #[error("expired auth_id or flow_id")]
     FlowExpired,
 
+    #[error("missing field token_request")]
+    MissingFieldTokenRequest,
+
     #[error("incorrect username for login finish")]
     IncorrectFinishUsername,
 

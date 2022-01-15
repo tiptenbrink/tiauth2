@@ -1,10 +1,10 @@
 use std::collections::HashSet;
 use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
-use rand::RngCore;
 use rand::rngs::OsRng;
 use sha2::{Digest, Sha256};
 use once_cell::sync::Lazy;
+use rand::{RngCore};
 
 
 pub fn utc_timestamp() -> u64 {
@@ -49,6 +49,8 @@ pub fn usp_hex(utf_str: &str) -> String {
 
 #[cfg(test)]
 mod tests {
+    use rand::rngs::{StdRng, ThreadRng};
+    use rand::{Rng, SeedableRng, thread_rng};
     use super::*;
 
     #[test]
