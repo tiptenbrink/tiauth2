@@ -7,18 +7,15 @@ use std::sync::Arc;
 use axum::{AddExtensionLayer, body, Router};
 use axum::body::boxed;
 use axum::http::{Method, StatusCode};
-use axum::http::header::{CONTENT_TYPE, ACCEPT, CONTENT_LENGTH};
 use axum::response::{IntoResponse, Response};
-use axum::routing::{get, post, any as router_any};
-use tower::ServiceBuilder;
+use axum::routing::{get, post};
 use files::serve_static;
 use oauth::oauth_endpoint;
-use crate::data::kv::KeyValue;
 use crate::data::source::Source;
 use crate::error::Error;
-use crate::server::auth::start_login;
-use crate::server::models::TJson;
+use crate::server::auth::{finish_login, finish_register, start_login, start_register};
 use tower_http::cors::{CorsLayer, any};
+use crate::server::oauth::oauth_finish;
 
 pub async fn run_server() {
     let db_uri = "postgres://dodeka:postpost@localhost:3141/dodeka";
@@ -50,7 +47,11 @@ pub async fn run_server() {
     
     let app = Router::new().route("/", get(|| async { "Hello, World!" }))
         .route("/oauth/authorize/", get(oauth_endpoint))
-        .route("/login/start/", router_any(start_login))
+        .route("/oauth/callback/", get(oauth_finish))
+        .route("/login/start/", post(start_login))
+        .route("/login/finish/", post(finish_login))
+        .route("/register/start/", post(start_register))
+        .route("/register/finish/", post(finish_register))
         .nest("/credentials", get(serve_static))
         .layer(AddExtensionLayer::new(dsrc))
         .layer(cors);

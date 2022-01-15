@@ -16,7 +16,7 @@ const AuthRedirect = () => {
         const params = new URLSearchParams({
             "response_type": "code",
             "client_id":  "test_client",
-            "redirect_uri":  "http://localhost:3072/auth/callback",
+            "redirect_uri":  "http://localhost:3073",
             "state": state,
             "code_challenge": challenge,
             "code_challenge_method": "S256",

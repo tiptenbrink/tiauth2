@@ -11,11 +11,6 @@ pub struct AuthRequest {
     pub nonce: String
 }
 
-#[derive(Debug, Deserialize, Serialize)]
-pub struct TJson {
-    pub cool: String
-}
-
 #[derive(Deserialize)]
 pub struct PasswordRequest {
     pub username: String,
@@ -26,4 +21,38 @@ pub struct PasswordRequest {
 pub struct PasswordResponse {
     pub server_message: String,
     pub auth_id: String
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct SavedState {
+    pub user_usph: String,
+    pub state: String
+}
+
+#[derive(Deserialize)]
+pub struct FinishLogin {
+    pub auth_id: String,
+    pub username: String,
+    pub client_request: String,
+    pub flow_id: String
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct FlowUser {
+    pub user_usph: String,
+    pub flow_id: String,
+    pub auth_time: u64
+}
+
+#[derive(Deserialize)]
+pub struct FinishRegister {
+    pub auth_id: String,
+    pub username: String,
+    pub client_request: String
+}
+
+#[derive(Deserialize)]
+pub struct OAuthFinish {
+    pub flow_id: String,
+    pub code: String
 }

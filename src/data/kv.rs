@@ -1,5 +1,5 @@
 use redis::aio::ConnectionManager;
-use serde::{Deserialize, Serialize};
+use serde::{Serialize};
 use serde_json::{from_str as serde_from_j_str, to_string as serde_to_j_str};
 use crate::error::Error;
 use async_trait::async_trait;

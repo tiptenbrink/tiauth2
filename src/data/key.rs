@@ -64,6 +64,10 @@ pub async fn get_opaque_private(dsrc: &Source) -> Result<String, Error> {
     Ok(get_opaque_key(dsrc).await?.private)
 }
 
+pub async fn get_opaque_public(dsrc: &Source) -> Result<String, Error> {
+    Ok(get_opaque_key(dsrc).await?.public)
+}
+
 async fn get_opaque_key(dsrc: &Source) -> Result<Key, Error> {
     let key_row = get_key_row(dsrc, 0).await?;
     let empty = key_row.is_none();

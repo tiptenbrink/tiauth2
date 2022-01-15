@@ -54,10 +54,11 @@ pub async fn get_user_by_usph(dsrc: &Source, usp_hex: &str) -> Result<Option<Use
     dsrc.db.retrieve_by_unique::<User>("users", "usp_hex", val).await
 }
 
-pub async fn upsert_user_row(dsrc: &Source, row: &User) -> Result<(), Error> {
-    dsrc.db.upsert_by_id("users", row).await
-}
+// Uncomment when used
+// pub async fn upsert_user_row(dsrc: &Source, row: &User) -> Result<(), Error> {
+//     dsrc.db.upsert_by_id("users", row).await
+// }
 
-pub async fn new_user(dsrc: &Source, row: &User) -> Result<i32, Error> {
+pub async fn new_user_return_id(dsrc: &Source, row: &User) -> Result<i32, Error> {
     dsrc.db.insert_return_id("users", row).await
 }

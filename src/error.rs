@@ -3,6 +3,12 @@ pub enum Error {
     #[error("required exists")]
     RequiredExists,
 
+    #[error("expired auth_id or flow_id")]
+    FlowExpired,
+
+    #[error("incorrect username for login finish")]
+    IncorrectFinishUsername,
+
     #[error("opaque error: {0}")]
     OpaqueError(#[from] opaquebind::Error),
 
