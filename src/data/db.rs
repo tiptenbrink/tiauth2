@@ -8,11 +8,11 @@ use sea_query_driver_postgres::{bind_query, bind_query_as};
 
 #[async_trait]
 pub trait Database {
-    async fn retrieve_by_id<T>(&self, table: &str, id: i32) -> Result<T, Error>
+    async fn retrieve_by_id<T>(&self, table: &str, id: i32) -> Result<Option<T>, Error>
         where
             T: for<'r> FromRow<'r, PgRow> + Send + Unpin;
 
-    async fn retrieve_by_unique<T>(&self, table: &str, unique_column: &str, value: Values) -> Result<T, Error>
+    async fn retrieve_by_unique<T>(&self, table: &str, unique_column: &str, value: Values) -> Result<Option<T>, Error>
         where
             T: for<'r> FromRow<'r, PgRow> + Send + Unpin;
 
@@ -34,25 +34,25 @@ pub trait Row {
 
 #[async_trait]
 impl Database for PSQL {
-    async fn retrieve_by_id<T>(&self, table: &str, id: i32) -> Result<T, Error>
+    async fn retrieve_by_id<T>(&self, table: &str, id: i32) -> Result<Option<T>, Error>
     where
         T: for<'r> FromRow<'r, PgRow> + Send + Unpin
     {
         let query = format!("SELECT * FROM {table} WHERE id = $1", table=table);
-        let row: T = sqlx::query_as(
+        let row: Option<T> = sqlx::query_as(
             &query
         )
             .bind(id)
-            .fetch_one(&self.pool).await?;
+            .fetch_optional(&self.pool).await?;
         Ok(row)
     }
 
-    async fn retrieve_by_unique<T>(&self, table: &str, unique_column: &str, value: Values) -> Result<T, Error>
+    async fn retrieve_by_unique<T>(&self, table: &str, unique_column: &str, value: Values) -> Result<Option<T>, Error>
         where
             T: for<'r> FromRow<'r, PgRow> + Send + Unpin
     {
         let query = format!("SELECT * FROM {table} WHERE {column} = $1", table=table, column=unique_column);
-        let row: T = bind_query_as(sqlx::query_as(&query), &value).fetch_one(&self.pool).await?;
+        let row: Option<T> = bind_query_as(sqlx::query_as(&query), &value).fetch_optional(&self.pool).await?;
         Ok(row)
     }
 

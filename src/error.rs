@@ -1,5 +1,11 @@
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
+    #[error("required exists")]
+    RequiredExists,
+
+    #[error("opaque error: {0}")]
+    OpaqueError(#[from] opaquebind::Error),
+
     #[error("db error: {0}")]
     DbError(#[from] sqlx::Error),
 
