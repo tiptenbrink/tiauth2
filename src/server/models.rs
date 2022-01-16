@@ -66,3 +66,13 @@ pub struct TokenRequest {
     pub code_verifier: Option<String>,
     pub refresh_token: Option<String>
 }
+
+#[derive(Serialize)]
+pub struct TokenResponse {
+    pub id_token: String,
+    pub access_token: String,
+    pub refresh_token: String,
+    pub token_type: String,
+    pub expires_in: i32,
+    pub scope: String,
+}

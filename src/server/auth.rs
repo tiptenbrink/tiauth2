@@ -8,7 +8,8 @@ use crate::data::kv::KeyValue;
 use crate::data::source::Source;
 use crate::data::user;
 use crate::data::user::{new_user_return_id, User};
-use crate::error::Error;
+use crate::error::{BadFlow, Error};
+use crate::error::BadFlow::ExpiredAuthId;
 use crate::server::models::{FinishLogin, FinishRegister, FlowUser, PasswordRequest, PasswordResponse, SavedState};
 use crate::utility;
 use crate::utility::{usp_hex};
@@ -42,7 +43,7 @@ pub async fn start_login(Json(login_start): Json<PasswordRequest>, Extension(dsr
 
 pub async fn finish_login(Json(login_finish): Json<FinishLogin>, Extension(dsrc): Extension<Arc<Source>>) -> Result<(), Error> {
     let saved_state: SavedState = dsrc.kv.get_json(&login_finish.auth_id).await?
-        .ok_or(Error::FlowExpired)?;
+        .ok_or(Error::BadFlow(ExpiredAuthId))?;
     let user_usph = usp_hex(&login_finish.username);
     if user_usph != saved_state.user_usph {
       return Err(Error::IncorrectFinishUsername)
@@ -84,7 +85,7 @@ pub async fn start_register(Json(register_start): Json<PasswordRequest>, Extensi
 
 pub async fn finish_register(Json(login_finish): Json<FinishRegister>, Extension(dsrc): Extension<Arc<Source>>) -> Result<(), Error> {
     let saved_state: SavedState = dsrc.kv.get_json(&login_finish.auth_id).await?
-        .ok_or(Error::FlowExpired)?;
+        .ok_or(Error::BadFlow(ExpiredAuthId))?;
     let user_usph = usp_hex(&login_finish.username);
     if user_usph != saved_state.user_usph {
         return Err(Error::IncorrectFinishUsername)

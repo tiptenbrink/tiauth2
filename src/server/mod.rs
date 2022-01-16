@@ -3,6 +3,7 @@ mod oauth;
 mod models;
 mod files;
 
+use std::net::SocketAddr;
 use std::sync::Arc;
 use axum::{AddExtensionLayer, body, Router};
 use axum::body::boxed;
@@ -14,10 +15,20 @@ use oauth::oauth_endpoint;
 use crate::data::source::Source;
 use crate::error::Error;
 use crate::server::auth::{finish_login, finish_register, start_login, start_register};
-use tower_http::cors::{CorsLayer, any};
 use crate::server::oauth::oauth_finish;
+use tower_http::cors::{CorsLayer, any};
+use tower_http::trace::TraceLayer;
+
 
 pub async fn run_server() {
+    if std::env::var_os("RUST_LOG").is_none() {
+        std::env::set_var(
+            "RUST_LOG",
+            "tiauth2=debug,tower_http=debug",
+        )
+    }
+    tracing_subscriber::fmt::init();
+
     let db_uri = "postgres://dodeka:postpost@localhost:3141/dodeka";
     let kv_uri = "redis://127.0.0.1:6379";
 
@@ -53,10 +64,14 @@ pub async fn run_server() {
         .route("/register/start/", post(start_register))
         .route("/register/finish/", post(finish_register))
         .nest("/credentials", get(serve_static))
+        .layer(TraceLayer::new_for_http())
         .layer(AddExtensionLayer::new(dsrc))
         .layer(cors);
 
-    axum::Server::bind(&"127.0.0.1:3073".parse().unwrap())
+    let addr = SocketAddr::from(([127, 0, 0, 1], 3073));
+    tracing::debug!("listening on {}", addr);
+
+    axum::Server::bind(&addr)
         .serve(app.into_make_service())
         .await
         .unwrap();
