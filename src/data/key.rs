@@ -2,7 +2,7 @@ use sea_query::{Value, Values};
 use crate::data::db::{Database, Row};
 use crate::data::source::Source;
 use crate::error::Error;
-use crate::auth::keyutil::new_curve25519_keypair;
+use crate::auth::keyutil::{new_curve25519_keypair, new_ed448_keypair, new_symmetric_keypair};
 
 #[derive(sqlx::FromRow, Debug, Clone)]
 pub struct Key {
@@ -68,11 +68,23 @@ pub async fn get_opaque_public(dsrc: &Source) -> Result<String, Error> {
     Ok(get_opaque_key(dsrc).await?.public)
 }
 
+pub async fn get_token_private(dsrc: &Source) -> Result<String, Error> {
+    Ok(get_token_key(dsrc).await?.private)
+}
+
+pub async fn get_refresh_symmetric(dsrc: &Source) -> Result<String, Error> {
+    Ok(get_symmetric_key(dsrc).await?.private)
+}
+
 async fn get_opaque_key(dsrc: &Source) -> Result<Key, Error> {
-    let key_row = get_key_row(dsrc, 0).await?;
+    get_or_create_key(dsrc, 0, new_curve25519_keypair).await
+}
+
+async fn get_or_create_key(dsrc: &Source, id: i32, create_fn: fn() -> Key) -> Result<Key, Error> {
+    let key_row = get_key_row(dsrc, id).await?;
     let empty = key_row.is_none();
     let key = key_row.unwrap_or_else(|| {
-        let key_row = new_curve25519_keypair();
+        let key_row = create_fn();
         key_row
     });
     if empty {
@@ -80,6 +92,14 @@ async fn get_opaque_key(dsrc: &Source) -> Result<Key, Error> {
     }
 
     Ok(key)
+}
+
+async fn get_token_key(dsrc: &Source) -> Result<Key, Error> {
+    get_or_create_key(dsrc, 1, new_ed448_keypair).await
+}
+
+async fn get_symmetric_key(dsrc: &Source) -> Result<Key, Error> {
+    get_or_create_key(dsrc, 2, new_symmetric_keypair).await
 }
 
 pub async fn upsert_key_row(dsrc: &Source, row: &Key) -> Result<(), Error> {

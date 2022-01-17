@@ -15,9 +15,10 @@ use oauth::oauth_endpoint;
 use crate::data::source::Source;
 use crate::error::Error;
 use crate::server::auth::{finish_login, finish_register, start_login, start_register};
-use crate::server::oauth::oauth_finish;
+use crate::server::oauth::{oauth_finish, token};
 use tower_http::cors::{CorsLayer, any};
 use tower_http::trace::TraceLayer;
+use crate::auth::tokens::new_token_family;
 
 
 pub async fn run_server() {
@@ -59,6 +60,7 @@ pub async fn run_server() {
     let app = Router::new().route("/", get(|| async { "Hello, World!" }))
         .route("/oauth/authorize/", get(oauth_endpoint))
         .route("/oauth/callback/", get(oauth_finish))
+        .route("/oauth/token/", post(token))
         .route("/login/start/", post(start_login))
         .route("/login/finish/", post(finish_login))
         .route("/register/start/", post(start_register))
