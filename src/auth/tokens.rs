@@ -23,21 +23,39 @@ struct AccessToken {
 
 async fn symmetric_crypt_key(dsrc: &Source, mut data: Vec<u8>) -> Result<String, Error> {
     let key = key::get_refresh_symmetric(&dsrc).await?;
-    symmetric_crypt(&key, data)
+    let key_bytes = base64::decode_config(key, base64::URL_SAFE_NO_PAD)?;
+    let crypt_bytes = symmetric_crypt(key_bytes.as_slice(), data)?;
+    Ok(base64::encode_config(crypt_bytes, base64::URL_SAFE_NO_PAD))
 }
 
-fn symmetric_crypt(key: &str, mut data: Vec<u8>) -> Result<String, Error> {
-    let key_bytes = base64::decode_config(key, base64::URL_SAFE_NO_PAD)?;
-    let unbound_key = aead::UnboundKey::new(&AES_256_GCM, &key_bytes)?;
+fn symmetric_crypt(key: &[u8], mut data: Vec<u8>) -> Result<Vec<u8>, Error> {
+    let unbound_key = aead::UnboundKey::new(&AES_256_GCM, key)?;
     let mut nonce_bytes = [0u8; 12];
     OsRng.fill_bytes(&mut nonce_bytes);
     let mut symmetric_bytes = nonce_bytes.clone().to_vec();
     let nonce = Nonce::assume_unique_for_key(nonce_bytes);
     let encrypter = aead::LessSafeKey::new(unbound_key);
-    encrypter.seal_in_place_append_tag(nonce, Aad::empty(), &mut data);
+    encrypter.seal_in_place_append_tag(nonce, Aad::empty(), &mut data)?;
     symmetric_bytes.extend(data);
 
-    Ok(base64::encode_config(symmetric_bytes, base64::URL_SAFE_NO_PAD))
+    // out: nonce (12 bytes) + ciphertext + tag appended
+    Ok(symmetric_bytes)
+}
+
+fn symmetric_decrypt(key: &[u8], encrypted: Vec<u8>) -> Result<Vec<u8>, Error> {
+    // encrypted: nonce (12 bytes) + ciphertext + tag appended
+    let unbound_key = aead::UnboundKey::new(&AES_256_GCM, key)?;
+
+    if encrypted.len() < 12 {
+        return Err(Error::BadCryptInput)
+    }
+    let (nonce_slice, crypt) = encrypted.split_at(12);
+    let nonce_sized = <[u8; 12]>::try_from(nonce_slice.clone()).map_err(|e| Error::BadCryptInput)?;
+    let nonce = Nonce::assume_unique_for_key(nonce_sized);
+    let decrypter = aead::LessSafeKey::new(unbound_key);
+    let mut crypt = crypt.to_vec();
+    let out = decrypter.open_in_place(nonce, Aad::empty(), &mut crypt)?;
+    Ok(out.to_vec())
 }
 
 pub async fn refresh_all_tokens(dsrc: &Source) -> Result<Tokens, Error> {
@@ -86,8 +104,13 @@ mod tests {
 
     #[test]
     fn test_encrypt() {
+        let input = "hello".to_owned();
         let key = new_symmetric_keypair();
-        let x = symmetric_crypt(&key.private, "hello".to_owned().into_bytes()).unwrap();
-        println!("{}", x);
+        let key_bytes = base64::decode_config(&key.private, base64::URL_SAFE_NO_PAD).unwrap();
+        let x = symmetric_crypt(key_bytes.as_slice(), (&input).as_bytes().to_vec()).unwrap();
+        //println!("{}", base64::encode_config(&x, base64::URL_SAFE_NO_PAD));
+        let z = symmetric_decrypt(key_bytes.as_slice(), x).unwrap();
+        let u = String::from_utf8(z).unwrap();
+        assert_eq!(input, u)
     }
 }

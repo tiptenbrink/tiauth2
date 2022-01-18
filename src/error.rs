@@ -37,7 +37,10 @@ pub enum Error {
     SerdeError(#[from] serde_json::Error),
 
     #[error("decode error base64: {0}")]
-    DecodeError(#[from] base64::DecodeError)
+    DecodeError(#[from] base64::DecodeError),
+
+    #[error("crypt error")]
+    BadCryptInput
 }
 
 #[derive(Debug, thiserror::Error)]
