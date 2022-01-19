@@ -40,8 +40,8 @@ impl<'a> Row for &'a SavedRefreshToken {
             Value::from(self.family_id.clone()),
             Value::from(self.access_value.clone()),
             Value::from(self.id_token_value.clone()),
-            Value::from(self.iat.clone()),
-            Value::from(self.exp.clone()),
+            Value::from(self.iat),
+            Value::from(self.exp),
             Value::from(self.nonce.clone()),
         ];
 
@@ -53,6 +53,18 @@ impl<'a> Row for &'a SavedRefreshToken {
     }
 }
 
-pub async fn insert_refresh_row(dsrc: &Source, row: &SavedRefreshToken) -> Result<i32, Error> {
+pub async fn refresh_save(dsrc: &Source, row: &SavedRefreshToken) -> Result<i32, Error> {
     dsrc.db.insert_return_id("refreshtokens", row).await
+}
+
+pub async fn get_refresh_by_id(dsrc: &Source, id: i32) -> Result<SavedRefreshToken, Error> {
+    dsrc.db.retrieve_by_id("refreshtokens", id).await?.ok_or(Error::RequiredExists)
+}
+
+pub async fn refresh_transaction(dsrc: &Source, id: i32) -> Result<SavedRefreshToken, Error> {
+    dsrc.db.retrieve_by_id("refreshtokens", id).await?.ok_or(Error::RequiredExists)
+}
+
+pub async fn delete_family(dsrc: &Source, id: i32) -> Result<SavedRefreshToken, Error> {
+    dsrc.db.retrieve_by_id("refreshtokens", id).await?.ok_or(Error::RequiredExists)
 }
