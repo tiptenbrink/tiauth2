@@ -18,8 +18,6 @@ use crate::server::auth::{finish_login, finish_register, start_login, start_regi
 use crate::server::oauth::{oauth_finish, token};
 use tower_http::cors::{CorsLayer, any};
 use tower_http::trace::TraceLayer;
-use crate::auth::tokens::new_token_family;
-use crate::data::refresh::{refresh_transaction, SavedRefreshToken};
 
 
 pub async fn run_server() {
@@ -57,15 +55,6 @@ pub async fn run_server() {
         // allow requests from any origin
         .allow_origin(any())
         .allow_headers(any());
-    let sv = SavedRefreshToken {
-        id: 0,
-        family_id: "abas".to_string(),
-        access_value: "asdfas".to_string(),
-        id_token_value: "asdfasd".to_string(),
-        iat: 0,
-        exp: 0,
-        nonce: "asdfasdf".to_string()
-    };
     
     let app = Router::new().route("/", get(|| async { "Hello, World!" }))
         .route("/oauth/authorize/", get(oauth_endpoint))

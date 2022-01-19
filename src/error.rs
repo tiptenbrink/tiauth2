@@ -1,5 +1,8 @@
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
+    #[error("invalid refresh")]
+    InvalidRefresh,
+
     #[error("no row")]
     NoRow,
 

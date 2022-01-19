@@ -6,7 +6,6 @@ use url::form_urlencoded::{byte_serialize};
 use encoding::{Encoding, EncoderTrap};
 use encoding::all::ASCII;
 use sha2::{Digest, Sha256};
-use sha2::digest::DynDigest;
 use base64;
 use crate::auth::tokens::{new_token_family, refresh_all_tokens};
 use crate::data::kv::KeyValue;
@@ -82,9 +81,9 @@ pub async fn token(Json(token_request): Json<TokenRequest>, Extension(dsrc): Ext
 
         new_token_family(&dsrc).await
     } else if token_request.grant_type == "refresh_token" {
-        let refresh_token = token_request.refresh_token.ok_or(Error::MissingFieldTokenRequest)?;
+        let old_refresh_token = token_request.refresh_token.ok_or(Error::MissingFieldTokenRequest)?;
 
-        refresh_all_tokens(&dsrc).await
+        refresh_all_tokens(&dsrc, old_refresh_token).await
     } else {
         Err(Error::IncorrectField("token_request only supports authorization_code and refresh_token".to_string()))
     }?;

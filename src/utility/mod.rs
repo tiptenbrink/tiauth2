@@ -49,8 +49,6 @@ pub fn usp_hex(utf_str: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use rand::rngs::{StdRng, ThreadRng};
-    use rand::{Rng, SeedableRng, thread_rng};
     use super::*;
 
     #[test]

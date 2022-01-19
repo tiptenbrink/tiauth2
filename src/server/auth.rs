@@ -8,7 +8,7 @@ use crate::data::kv::KeyValue;
 use crate::data::source::Source;
 use crate::data::user;
 use crate::data::user::{new_user_return_id, User};
-use crate::error::{BadFlow, Error};
+use crate::error::{Error};
 use crate::error::BadFlow::ExpiredAuthId;
 use crate::server::models::{FinishLogin, FinishRegister, FlowUser, PasswordRequest, PasswordResponse, SavedState};
 use crate::utility;
