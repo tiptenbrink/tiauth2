@@ -1,7 +1,10 @@
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-    #[error("required exists")]
-    RequiredExists,
+    #[error("no row")]
+    NoRow,
+
+    #[error("required does not exist")]
+    RequiredNotExists,
 
     #[error("bad flow: {0}")]
     BadFlow(BadFlow),

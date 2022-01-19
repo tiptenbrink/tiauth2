@@ -1,4 +1,4 @@
-use sqlx::{FromRow, Pool, Postgres};
+use sqlx::{Executor, FromRow, Pool, Postgres, Transaction};
 use async_trait::async_trait;
 use sqlx::postgres::{PgRow};
 use crate::error::Error;
@@ -20,9 +20,9 @@ pub trait Database {
 
     async fn insert_return_id<T: Row + Send>(&self, table: &str, row: T) -> Result<i32, Error>;
 
-    async fn delete_by_id<T: Row + Send>(&self, table: &str, id: i32) -> Result<(), Error>;
+    async fn delete_by_id_required(&self, table: &str, id: i32) -> Result<(), Error>;
 
-    async fn delete_by_column<T: Row + Send, V: Send>(&self, table: &str, column: &str, column_val: V) -> Result<(), Error>
+    async fn delete_by_column<V: Send>(&self, table: &str, column: &str, column_val: V) -> Result<(), Error>
         where
             sea_query::Value: From<V>;
 
@@ -74,25 +74,17 @@ impl Database for PSQL {
     }
 
     async fn insert_return_id<T: Row + Send>(&self, table: &str, row: T) -> Result<i32, Error> {
-        let query = format!("INSERT INTO {table} ({keys}) VALUES ({vals}) RETURNING (id)",
-                            table=table, keys=row.keys(false), vals=row.vals(false));
-        let values = row.values(false).to_owned();
-        let id: (i32,) = bind_query_as(sqlx::query_as(&query), &values).fetch_one(&self.pool).await?;
-        Ok(id.0)
+        psql_insert_return_id::<&Pool<Postgres>, T>(&self.pool, table, row).await
     }
 
-    async fn delete_by_id<T: Row + Send>(&self, table: &str, id: i32) -> Result<(), Error> {
-        let query = format!("DELETE FROM {table} WHERE id = $1", table=table);
-        sqlx::query(
-            &query
-        )
-            .bind(id).execute(&self.pool)
-            .await?;
-        Ok(())
+    /// Returns error if row does not exist
+    async fn delete_by_id_required(&self, table: &str, id: i32) -> Result<(), Error> {
+        psql_delete_by_id_required::<&Pool<Postgres>>(&self.pool, table, id).await
     }
 
     /// Don't allow users to send "column" as it is not injection-protected
-    async fn delete_by_column<T: Row + Send, V: Send>(&self, table: &str, column: &str, column_val: V) -> Result<(), Error>
+    /// If there are no rows, there is no error
+    async fn delete_by_column<V: Send>(&self, table: &str, column: &str, column_val: V) -> Result<(), Error>
         where
             sea_query::Value: From<V>
     {
@@ -103,10 +95,38 @@ impl Database for PSQL {
     }
 
     async fn delete_insert_return_id_transaction<T: Row + Send>(&self, table: &str, id_delete: i32, row: T) -> Result<i32, Error> {
-        let tx = &self.pool.begin().await?;
-        self.delete_by_id::<T>(table, id_delete).await?;
-        let id = self.insert_return_id(table, row).await?;
+        let mut tx = self.pool.begin().await?;
+        psql_delete_by_id_required::<&mut Transaction<Postgres>>(&mut tx, table, id_delete).await?;
+        let id = psql_insert_return_id::<&mut Transaction<Postgres>, T>(&mut tx, table, row).await?;
         tx.commit().await?;
         Ok(id)
     }
+}
+
+async fn psql_delete_by_id_required<'a, E>(exec: E, table: &str, id: i32) -> Result<(), Error>
+    where
+        E: Executor<'a, Database=Postgres>
+{
+    let query = format!("WITH deleted as (DELETE FROM {table} WHERE id = $1 returning 1)
+                                SELECT count(*) from deleted;", table=table);
+    let count: (i64,) = sqlx::query_as(
+        &query
+    )
+        .bind(id).fetch_one(exec)
+        .await?;
+    if count.0 == 0 {
+        return Err(Error::NoRow)
+    }
+    Ok(())
+}
+
+async fn psql_insert_return_id<'a, E, T: Row + Send>(exec: E, table: &str, row: T) -> Result<i32, Error>
+    where
+        E: Executor<'a, Database=Postgres>
+{
+    let query = format!("INSERT INTO {table} ({keys}) VALUES ({vals}) RETURNING (id)",
+                        table=table, keys=row.keys(false), vals=row.vals(false));
+    let values = row.values(false).to_owned();
+    let id: (i32,) = bind_query_as(sqlx::query_as(&query), &values).fetch_one(exec).await?;
+    Ok(id.0)
 }

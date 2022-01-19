@@ -58,13 +58,15 @@ pub async fn refresh_save(dsrc: &Source, row: &SavedRefreshToken) -> Result<i32,
 }
 
 pub async fn get_refresh_by_id(dsrc: &Source, id: i32) -> Result<SavedRefreshToken, Error> {
-    dsrc.db.retrieve_by_id("refreshtokens", id).await?.ok_or(Error::RequiredExists)
+    dsrc.db.retrieve_by_id("refreshtokens", id).await?.ok_or(Error::NoRow)
 }
 
-pub async fn refresh_transaction(dsrc: &Source, id: i32) -> Result<SavedRefreshToken, Error> {
-    dsrc.db.retrieve_by_id("refreshtokens", id).await?.ok_or(Error::RequiredExists)
+pub async fn refresh_transaction(dsrc: &Source, id_delete: i32, new_refresh: &SavedRefreshToken) -> Result<i32, Error> {
+    // CURRENTLY DOES NOT FAIL IF IT DOES NOT EXIST
+    // TODO add check in query delete if it did delete
+    dsrc.db.delete_insert_return_id_transaction("refreshtokens", id_delete, new_refresh).await
 }
 
-pub async fn delete_family(dsrc: &Source, id: i32) -> Result<SavedRefreshToken, Error> {
-    dsrc.db.retrieve_by_id("refreshtokens", id).await?.ok_or(Error::RequiredExists)
+pub async fn delete_family(dsrc: &Source, family_id: &str) -> Result<(), Error> {
+    dsrc.db.delete_by_column::<>("refreshtokens", "family_id", family_id).await
 }

@@ -21,7 +21,7 @@ pub async fn start_login(Json(login_start): Json<PasswordRequest>, Extension(dsr
 
     let password_file = user::get_user_by_usph(&dsrc, &user_usph).await?.unwrap_or(
         // id 0 is the fake record
-        user::get_user_by_id(&dsrc, 0).await?.ok_or(Error::RequiredExists)?
+        user::get_user_by_id(&dsrc, 0).await?.ok_or(Error::RequiredNotExists)?
     ).password_file;
 
     let auth_id = utility::random_time_hash_hex(Some(user_usph.as_bytes()));
