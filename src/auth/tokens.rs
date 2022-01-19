@@ -11,7 +11,7 @@ use crate::error::Error;
 use crate::utility::utc_timestamp;
 
 const ID_EXP: u64 = 10 * 60 * 60;
-const ACCESS_EXP: u64 = 1 * 60 * 60;
+pub const ACCESS_EXP: u64 = 1 * 60 * 60;
 const REFRESH_EXP: i32 = 1 * 60 * 60;
 
 const GRACE_PERIOD: i32 = 3 * 60;
@@ -63,11 +63,14 @@ struct IdToken {
 
 pub struct Tokens {
     pub access_token: String,
+    pub id_token: String,
+    pub refresh_token: String,
+    pub returned_scope: String
 }
 
 async fn get_private_key_bytes(dsrc: &Source) -> Result<Vec<u8>, Error> {
     let key = key::get_token_private(&dsrc).await?;
-    Ok(base64::decode_config(key, base64::URL_SAFE_NO_PAD)?)
+    Ok(key.into_bytes())
 }
 
 async fn get_symmetric_key_bytes(dsrc: &Source) -> Result<Vec<u8>, Error> {
@@ -134,9 +137,13 @@ async fn new_refresh_save(dsrc: &Source, old_refresh: SavedRefreshToken, utc_now
 
 pub async fn refresh_all_tokens(dsrc: &Source, old_refresh_token: String) -> Result<Tokens, Error> {
     let private_key = get_private_key_bytes(dsrc).await?;
+    tracing::debug!("got private key");
     let symmetric_key = get_symmetric_key_bytes(dsrc).await?;
+    tracing::debug!("got symmetric key");
     let old_refresh = decrypt_refresh_token(&symmetric_key, old_refresh_token)?;
+    tracing::debug!("refresh_token decrypted");
     let utc_now = utc_timestamp();
+
 
     let saved_refresh = match get_refresh_by_id(&dsrc, old_refresh.id).await {
         Ok(saved_refresh) => Ok(saved_refresh),
@@ -165,9 +172,8 @@ pub async fn refresh_all_tokens(dsrc: &Source, old_refresh_token: String) -> Res
     let id_token = encode_token(&private_key, &it)?;
 
     let refresh_token = new_refresh_save(dsrc, saved_refresh, utc_now, &symmetric_key).await?;
-    println!("{}", refresh_token);
 
-    Ok(Tokens { access_token: "".to_string() })
+    Ok(Tokens { access_token, id_token, refresh_token, returned_scope: at.scope })
 }
 
 pub async fn new_token_family(dsrc: &Source) -> Result<Tokens, Error> {
@@ -185,7 +191,7 @@ pub async fn new_token_family(dsrc: &Source) -> Result<Tokens, Error> {
 
     let enc = encode_token(private_key.as_bytes(), &at)?;
 
-    Ok(Tokens { access_token: enc })
+    Ok(Tokens { access_token: enc, id_token: "".to_string(), refresh_token: "".to_string(), returned_scope: "".to_string() })
 }
 
 pub fn encode_token<T: Serialize>(private_key: &[u8], claims: &T) -> Result<String, Error>{
@@ -197,7 +203,6 @@ pub fn encode_token<T: Serialize>(private_key: &[u8], claims: &T) -> Result<Stri
 #[cfg(test)]
 mod tests {
     use crate::auth::keyutil::new_symmetric_keypair;
-    use crate::data::refresh::SavedRefreshToken;
     use super::*;
 
     #[test]

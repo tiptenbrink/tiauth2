@@ -1,5 +1,4 @@
 use sea_query::{Value, Values};
-use serde::Deserialize;
 use crate::data::db::{Database, Row};
 use crate::data::source::Source;
 use crate::error::Error;

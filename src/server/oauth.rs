@@ -7,6 +7,7 @@ use encoding::{Encoding, EncoderTrap};
 use encoding::all::ASCII;
 use sha2::{Digest, Sha256};
 use base64;
+use crate::auth::tokens;
 use crate::auth::tokens::{new_token_family, refresh_all_tokens};
 use crate::data::kv::KeyValue;
 use crate::server::models::{AuthRequest, FlowUser, OAuthFinish, TokenRequest, TokenResponse};
@@ -66,7 +67,7 @@ pub async fn token(Json(token_request): Json<TokenRequest>, Extension(dsrc): Ext
     // TODO clientID check
 
     let tokens = if token_request.grant_type == "authorization_code" {
-        let redirect_uri = token_request.redirect_uri.ok_or(Error::MissingFieldTokenRequest)?;
+        let redirect_uri_token = token_request.redirect_uri.ok_or(Error::MissingFieldTokenRequest)?;
         let code_verifier = token_request.code_verifier.ok_or(Error::MissingFieldTokenRequest)?;
         let code = token_request.code.ok_or(Error::MissingFieldTokenRequest)?;
 
@@ -75,12 +76,13 @@ pub async fn token(Json(token_request): Json<TokenRequest>, Extension(dsrc): Ext
         let auth_request: AuthRequest = dsrc.kv.get_json(&flow_user.flow_id).await?
             .ok_or(Error::BadFlow(ExpiredFlowId))?;
 
-        token_request_checks(&redirect_uri, &auth_request.redirect_uri,
+        token_request_checks(&redirect_uri_token, &auth_request.redirect_uri,
         &token_request.client_id, &auth_request.client_id, &code_verifier,
                                        &auth_request.code_challenge)?;
 
         new_token_family(&dsrc).await
     } else if token_request.grant_type == "refresh_token" {
+        tracing::debug!("refresh_token request");
         let old_refresh_token = token_request.refresh_token.ok_or(Error::MissingFieldTokenRequest)?;
 
         refresh_all_tokens(&dsrc, old_refresh_token).await
@@ -89,11 +91,11 @@ pub async fn token(Json(token_request): Json<TokenRequest>, Extension(dsrc): Ext
     }?;
     
     Ok(Json(TokenResponse{
-        id_token: "".to_string(),
-        access_token: "".to_string(),
-        refresh_token: "".to_string(),
-        token_type: "".to_string(),
-        expires_in: 0,
-        scope: "".to_string()
+        id_token: tokens.id_token,
+        access_token: tokens.access_token,
+        refresh_token: tokens.refresh_token,
+        token_type: "Bearer".to_string(),
+        expires_in: tokens::ACCESS_EXP as i32,
+        scope: tokens.returned_scope
     }))
 }
