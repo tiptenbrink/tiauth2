@@ -57,10 +57,10 @@ export async function validateIdToken(id_json: string) {
 
     let web_included = false
     id_payload.aud.forEach(aud => {
-        if (aud === "test_client") {
+        if (aud === "reminders.tipten.nl") {
             web_included = true
         }
-        else if (aud !== "test_client") {
+        else if (aud !== "reminders.tipten.nl") {
             throw new Error("Invalid audience!")
         }
     })

@@ -1,10 +1,14 @@
 use std::collections::HashSet;
 use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
+use base64::DecodeError;
 use rand::rngs::OsRng;
 use sha2::{Digest, Sha256};
 use once_cell::sync::Lazy;
 use rand::{RngCore};
+use serde::Serialize;
+use serde::de::DeserializeOwned;
+use crate::error::Error;
 
 
 pub fn utc_timestamp() -> u64 {
@@ -45,6 +49,36 @@ pub fn usp_hex(utf_str: &str) -> String {
         }
     }
     anp_base6url_str
+}
+
+pub fn enc_b64url<T: AsRef<[u8]>>(to_enc: T) -> String {
+    base64::encode_config(to_enc, base64::URL_SAFE_NO_PAD)
+}
+
+pub fn dec_b64url<T: AsRef<[u8]>>(to_dec: T) -> Result<Vec<u8>, DecodeError> {
+    base64::decode_config(to_dec, base64::URL_SAFE_NO_PAD)
+}
+
+pub fn enc_struct<T>(strct: &T) -> Result<String, Error>
+    where
+        T: ?Sized + Serialize
+{
+    let strct_bytes = serde_json::to_vec(strct)?;
+    Ok(enc_b64url(&strct_bytes))
+}
+
+pub fn dec_struct<'a, T: AsRef<[u8]>, V>(strct_str: T) -> Result<V, Error>
+    where
+        V: DeserializeOwned
+{
+    let strct_bytes = dec_b64url(strct_str)?;
+    Ok(serde_json::from_slice::<V>(&strct_bytes)?)
+}
+
+pub fn rng_urlsafe(n_bytes: usize) -> String {
+    let mut rng_bytes = vec![0; n_bytes];
+    OsRng.fill_bytes(&mut rng_bytes);
+    base64::encode_config(&rng_bytes, base64::URL_SAFE_NO_PAD)
 }
 
 #[cfg(test)]

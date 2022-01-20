@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import {binToBase64Url} from "./functions/AuthUtility";
 import {computeCodeVerifier, computeRandom, encodedHashBin} from "./functions/OAuth";
 
+export const redirect_uri = "http://localhost:3072/callback"
 
 const AuthRedirect = () => {
     const handleRedirect = async () => {
@@ -15,8 +16,8 @@ const AuthRedirect = () => {
 
         const params = new URLSearchParams({
             "response_type": "code",
-            "client_id":  "test_client",
-            "redirect_uri":  "http://localhost:3073",
+            "client_id":  "reminders.tipten.nl",
+            "redirect_uri":  redirect_uri,
             "state": state,
             "code_challenge": challenge,
             "code_challenge_method": "S256",

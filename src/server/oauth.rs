@@ -6,7 +6,6 @@ use url::form_urlencoded::{byte_serialize};
 use encoding::{Encoding, EncoderTrap};
 use encoding::all::ASCII;
 use sha2::{Digest, Sha256};
-use base64;
 use crate::auth::tokens;
 use crate::auth::tokens::{new_token_family, refresh_all_tokens};
 use crate::data::kv::KeyValue;
@@ -14,7 +13,7 @@ use crate::server::models::{AuthRequest, FlowUser, OAuthFinish, TokenRequest, To
 use crate::data::source::Source;
 use crate::error::Error;
 use crate::error::BadFlow::{ExpiredFlowId, BadChallenge, ExpiredCode};
-use crate::utility::random_time_hash_hex;
+use crate::utility::{enc_b64url, random_time_hash_hex};
 
 pub async fn oauth_endpoint(Query(auth_request): Query<AuthRequest>, Extension(dsrc): Extension<Arc<Source>>) -> Result<Redirect, Error> {
     let flow_id = random_time_hash_hex(None);
@@ -54,7 +53,7 @@ fn token_request_checks(redirect_uri_token: &str, redirect_uri_auth: &str, clien
     let ascii_encoded = ASCII.encode(code_verifier, EncoderTrap::Strict)
         .or_else(|e| Err(Error::BadFieldEncoding(e.to_string())))?;
     let computed_challenge_hash = Sha256::digest(&ascii_encoded);
-    let challenge = base64::encode(computed_challenge_hash);
+    let challenge = enc_b64url(computed_challenge_hash);
 
     if challenge != code_challenge_auth {
         return Err(Error::BadFlow(BadChallenge))
@@ -80,7 +79,10 @@ pub async fn token(Json(token_request): Json<TokenRequest>, Extension(dsrc): Ext
         &token_request.client_id, &auth_request.client_id, &code_verifier,
                                        &auth_request.code_challenge)?;
 
-        new_token_family(&dsrc).await
+        // TODO implement scope
+        let scope = "test".to_string();
+
+        new_token_family(&dsrc, flow_user.user_usph, scope, auth_request.nonce, flow_user.auth_time).await
     } else if token_request.grant_type == "refresh_token" {
         tracing::debug!("refresh_token request");
         let old_refresh_token = token_request.refresh_token.ok_or(Error::MissingFieldTokenRequest)?;

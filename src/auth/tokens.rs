@@ -1,14 +1,13 @@
 use jsonwebtoken::Algorithm::ED448;
 use jsonwebtoken::{encode, Header, EncodingKey};
-use rand::RngCore;
-use rand::rngs::OsRng;
 use serde::{Serialize, Deserialize};
 use crate::data::key;
 use crate::data::source::Source;
 use crate::auth::auth::{symmetric_crypt, symmetric_decrypt};
-use crate::data::refresh::{delete_family, get_refresh_by_id, refresh_transaction, SavedRefreshToken};
+use crate::config::{AUD, ISS};
+use crate::data::refresh::{delete_family, get_refresh_by_id, refresh_save, refresh_transaction, SavedRefreshToken};
 use crate::error::Error;
-use crate::utility::utc_timestamp;
+use crate::utility::{enc_struct, rng_urlsafe, utc_timestamp};
 
 const ID_EXP: u64 = 10 * 60 * 60;
 pub const ACCESS_EXP: u64 = 1 * 60 * 60;
@@ -90,13 +89,17 @@ fn encrypt_refresh_token(symmetric_key: &[u8], refresh_token: RefreshToken) -> R
     Ok(base64::encode_config(&refresh, base64::URL_SAFE_NO_PAD))
 }
 
-fn get_finish_tokens(saved_refresh: &SavedRefreshToken, utc_now: u64) -> Result<(AccessToken, IdToken), Error> {
+fn get_finish_tokens_from_save(saved_refresh: &SavedRefreshToken, utc_now: u64) -> Result<(AccessToken, IdToken), Error> {
     let at_bytes = base64::decode_config(saved_refresh.access_value.clone(), base64::URL_SAFE_NO_PAD)?;
     let it_bytes = base64::decode_config(saved_refresh.id_token_value.clone(), base64::URL_SAFE_NO_PAD)?;
 
     let at: AccessTokenUntimed = serde_json::from_slice(&at_bytes)?;
     let it: IdTokenUntimed = serde_json::from_slice(&it_bytes)?;
 
+    get_finish_tokens(at, it, utc_now)
+}
+
+fn get_finish_tokens(at: AccessTokenUntimed, it: IdTokenUntimed, utc_now: u64) -> Result<(AccessToken, IdToken), Error> {
     let at = AccessToken { iat: utc_now, exp: utc_now + ACCESS_EXP,
         sub: at.sub,
         iss: at.iss,
@@ -116,9 +119,7 @@ fn get_finish_tokens(saved_refresh: &SavedRefreshToken, utc_now: u64) -> Result<
 }
 
 fn new_refresh(old_refresh: SavedRefreshToken, utc_now: u64) -> Result<(SavedRefreshToken, String), Error> {
-    let mut nonce_bytes = [0u8; 16];
-    OsRng.fill_bytes(&mut nonce_bytes);
-    let nonce = base64::encode_config(&nonce_bytes, base64::URL_SAFE_NO_PAD);
+    let nonce = rng_urlsafe(16);
 
     Ok((SavedRefreshToken { nonce: nonce.clone(), iat: utc_now as i32, ..old_refresh }, nonce))
 }
@@ -133,6 +134,23 @@ async fn new_refresh_save(dsrc: &Source, old_refresh: SavedRefreshToken, utc_now
     };
 
     Ok(encrypt_refresh_token(symmetric_key, refresh_token)?)
+}
+
+fn id_access_token(sub: &str, iss: &str, aud_access: Vec<String>, aud_id: Vec<String>, scope: &str, auth_time: u64, id_nonce: &str) -> (AccessTokenUntimed, IdTokenUntimed) {
+    let at = AccessTokenUntimed {
+        sub: sub.to_owned(),
+        iss: iss.to_owned(),
+        aud: aud_access,
+        scope: scope.to_owned()
+    };
+    let it = IdTokenUntimed {
+        sub: sub.to_owned(),
+        iss: iss.to_owned(),
+        aud: aud_id,
+        auth_time,
+        nonce: id_nonce.to_owned()
+    };
+    (at, it)
 }
 
 pub async fn refresh_all_tokens(dsrc: &Source, old_refresh_token: String) -> Result<Tokens, Error> {
@@ -166,7 +184,7 @@ pub async fn refresh_all_tokens(dsrc: &Source, old_refresh_token: String) -> Res
         return Err(Error::InvalidRefresh)
     }
 
-    let (at, it) = get_finish_tokens(&saved_refresh, utc_now)?;
+    let (at, it) = get_finish_tokens_from_save(&saved_refresh, utc_now)?;
 
     let access_token = encode_token(&private_key, &at)?;
     let id_token = encode_token(&private_key, &it)?;
@@ -176,22 +194,50 @@ pub async fn refresh_all_tokens(dsrc: &Source, old_refresh_token: String) -> Res
     Ok(Tokens { access_token, id_token, refresh_token, returned_scope: at.scope })
 }
 
-pub async fn new_token_family(dsrc: &Source) -> Result<Tokens, Error> {
+pub async fn new_token_family(dsrc: &Source, user_usph: String, scope: String, id_nonce: String, auth_time: u64) -> Result<Tokens, Error> {
     let private_key = key::get_token_private(dsrc).await?;
     let symmetric_key = get_symmetric_key_bytes(dsrc).await?;
+    let utc_now = utc_timestamp();
 
-    let at = AccessToken {
-        sub: "ab".to_string(),
-        iss: "".to_string(),
-        aud: vec!["".to_string()],
-        scope: "".to_string(),
-        iat: 0,
-        exp: 0
+    let aud_vec: Vec<String> = AUD.to_vec().iter().map(|s| (*s).to_owned()).collect();
+
+    let (at, it) = id_access_token(
+        &user_usph,
+            ISS,
+        aud_vec.clone(),
+        aud_vec,
+        &scope,
+        auth_time,
+        &id_nonce
+    );
+
+    let at_enc = enc_struct(&at)?;
+    let it_enc = enc_struct(&it)?;
+    let family_id = rng_urlsafe(16);
+
+    let refresh_saved = SavedRefreshToken {
+        id: 0,
+        family_id,
+        access_value: at_enc,
+        id_token_value: it_enc,
+        iat: utc_now as i32,
+        exp: utc_now as i32 + REFRESH_EXP,
+        nonce: "".to_string()
     };
+    let refresh_id = refresh_save(&dsrc, &refresh_saved).await?;
 
-    let enc = encode_token(private_key.as_bytes(), &at)?;
+    let refresh = RefreshToken {
+        id: refresh_id,
+        family_id: refresh_saved.family_id,
+        nonce: refresh_saved.nonce
+    };
+    let refresh_token = encrypt_refresh_token(&symmetric_key, refresh)?;
+    let (at_fin, it_fin) = get_finish_tokens(at, it, utc_now)?;
 
-    Ok(Tokens { access_token: enc, id_token: "".to_string(), refresh_token: "".to_string(), returned_scope: "".to_string() })
+    let access_token = encode_token(private_key.as_bytes(), &at_fin)?;
+    let id_token = encode_token(private_key.as_bytes(), &it_fin)?;
+
+    Ok(Tokens { access_token, id_token, refresh_token, returned_scope: scope })
 }
 
 pub fn encode_token<T: Serialize>(private_key: &[u8], claims: &T) -> Result<String, Error>{
