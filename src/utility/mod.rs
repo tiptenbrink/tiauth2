@@ -78,7 +78,7 @@ pub fn dec_struct<'a, T: AsRef<[u8]>, V>(strct_str: T) -> Result<V, Error>
 pub fn rng_urlsafe(n_bytes: usize) -> String {
     let mut rng_bytes = vec![0; n_bytes];
     OsRng.fill_bytes(&mut rng_bytes);
-    base64::encode_config(&rng_bytes, base64::URL_SAFE_NO_PAD)
+    enc_b64url(&rng_bytes)
 }
 
 #[cfg(test)]

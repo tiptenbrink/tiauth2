@@ -4,6 +4,7 @@ use rand::RngCore;
 use rand::rngs::OsRng;
 
 use crate::data::Key;
+use crate::utility::enc_b64url;
 
 pub fn new_curve25519_keypair() -> Key {
     let (private, public) = generate_keys();
@@ -42,7 +43,7 @@ pub fn new_ed448_keypair() -> Key {
 pub fn new_symmetric_keypair() -> Key {
     let mut symmetric_bytes = [0u8; 32];
     OsRng.fill_bytes(&mut symmetric_bytes);
-    let symmetric = base64::encode_config(symmetric_bytes, base64::URL_SAFE_NO_PAD);
+    let symmetric = enc_b64url(symmetric_bytes);
 
     Key {
         id: 2,

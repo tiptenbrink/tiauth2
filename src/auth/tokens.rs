@@ -7,7 +7,7 @@ use crate::auth::auth::{symmetric_crypt, symmetric_decrypt};
 use crate::config::{AUD, ISS};
 use crate::data::refresh::{delete_family, get_refresh_by_id, refresh_save, refresh_transaction, SavedRefreshToken};
 use crate::error::Error;
-use crate::utility::{enc_struct, rng_urlsafe, utc_timestamp};
+use crate::utility::{dec_b64url, enc_b64url, enc_struct, rng_urlsafe, utc_timestamp};
 
 const ID_EXP: u64 = 10 * 60 * 60;
 pub const ACCESS_EXP: u64 = 1 * 60 * 60;
@@ -74,11 +74,11 @@ async fn get_private_key_bytes(dsrc: &Source) -> Result<Vec<u8>, Error> {
 
 async fn get_symmetric_key_bytes(dsrc: &Source) -> Result<Vec<u8>, Error> {
     let key = key::get_refresh_symmetric(&dsrc).await?;
-    Ok(base64::decode_config(key, base64::URL_SAFE_NO_PAD)?)
+    Ok(dec_b64url(key)?)
 }
 
 fn decrypt_refresh_token(symmetric_key: &[u8], refresh_token: String) -> Result<RefreshToken, Error> {
-    let refresh_bytes = base64::decode_config(refresh_token, base64::URL_SAFE_NO_PAD)?;
+    let refresh_bytes = dec_b64url(refresh_token)?;
     let refresh = symmetric_decrypt(symmetric_key, refresh_bytes)?;
     Ok(serde_json::from_slice(&refresh)?)
 }
@@ -86,12 +86,12 @@ fn decrypt_refresh_token(symmetric_key: &[u8], refresh_token: String) -> Result<
 fn encrypt_refresh_token(symmetric_key: &[u8], refresh_token: RefreshToken) -> Result<String, Error> {
     let refresh_bytes = serde_json::to_vec(&refresh_token)?;
     let refresh = symmetric_crypt(symmetric_key, refresh_bytes)?;
-    Ok(base64::encode_config(&refresh, base64::URL_SAFE_NO_PAD))
+    Ok(enc_b64url(&refresh))
 }
 
 fn get_finish_tokens_from_save(saved_refresh: &SavedRefreshToken, utc_now: u64) -> Result<(AccessToken, IdToken), Error> {
-    let at_bytes = base64::decode_config(saved_refresh.access_value.clone(), base64::URL_SAFE_NO_PAD)?;
-    let it_bytes = base64::decode_config(saved_refresh.id_token_value.clone(), base64::URL_SAFE_NO_PAD)?;
+    let at_bytes = dec_b64url(saved_refresh.access_value.clone())?;
+    let it_bytes = dec_b64url(saved_refresh.id_token_value.clone())?;
 
     let at: AccessTokenUntimed = serde_json::from_slice(&at_bytes)?;
     let it: IdTokenUntimed = serde_json::from_slice(&it_bytes)?;
